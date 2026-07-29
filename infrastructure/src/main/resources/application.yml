@@ -1,0 +1,9 @@
+server:
+  port: 5000
+
+spring:
+  application:
+    name: similar-products
+
+existing-apis:
+  base-url: ${EXISTING_APIS_BASE_URL:http://localhost:3001}

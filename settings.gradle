@@ -1,0 +1,3 @@
+rootProject.name = 'similar-products'
+
+include 'domain', 'application', 'infrastructure'
