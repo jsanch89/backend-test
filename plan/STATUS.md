@@ -5,7 +5,7 @@
 
 | ID  | Tarea                                              | Fase        | Estado      | Comentario |
 |-----|----------------------------------------------------|-------------|-------------|------------|
-| T01 | Inicializar repo Git público                       | Setup       | 🔵 En progreso |            |
+| T01 | Inicializar repo Git público                       | Setup       | ✅ Completada |            |
 | T02 | Proyecto Spring Boot + dependencias mínimas        | Setup       | ⬜ Pendiente |            |
 | T03 | API-first: contrato + openapi-generator            | Setup       | ⬜ Pendiente |            |
 | T04 | Estructura hexagonal (paquetes y puertos)          | Arquitectura| ⬜ Pendiente |            |
@@ -24,4 +24,4 @@
 | T17 | README (ejecución, tests, decisiones)              | Entrega     | ⬜ Pendiente |            |
 | T18 | Revisión final y push                              | Entrega     | ⬜ Pendiente |            |
 
-**Progreso global:** 0 / 18 tareas completadas
+**Progreso global:** 1 / 18 tareas completadas
