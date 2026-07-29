@@ -38,3 +38,6 @@ bin/
 
 ### Logs ###
 *.log
+
+/plan
+./claude
