@@ -7,3 +7,8 @@ spring:
 
 existing-apis:
   base-url: ${EXISTING_APIS_BASE_URL:http://localhost:3001}
+  connect-timeout-ms: 1000
+  response-timeout-ms: 2000
+  max-connections: 50
+  pending-acquire-max-count: 200
+  pending-acquire-timeout-ms: 2000
