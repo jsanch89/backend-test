@@ -5,6 +5,10 @@ spring:
   application:
     name: similar-products
 
+springdoc:
+  swagger-ui:
+    url: /api/similarProducts.yaml
+
 existing-apis:
   base-url: ${EXISTING_APIS_BASE_URL:http://localhost:3001}
   connect-timeout-ms: 1000
@@ -12,3 +16,18 @@ existing-apis:
   max-connections: 50
   pending-acquire-max-count: 200
   pending-acquire-timeout-ms: 2000
+
+resilience4j:
+  timelimiter:
+    instances:
+      productDetail:
+        timeout-duration: 2s
+  circuitbreaker:
+    instances:
+      productDetail:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 5

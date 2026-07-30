@@ -9,6 +9,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -49,6 +53,25 @@ class SimilarProductsServiceTest {
         StepVerifier.create(service.getSimilarProducts("1"))
                 .expectNext(new ProductDetail("3", "Product 3", 20.0, true))
                 .verifyComplete();
+    }
+
+    @Test
+    void shouldResolveDetailsInParallelNotSequentially() {
+        Duration upstreamDelay = Duration.ofMillis(100);
+        Flux<String> ids = Flux.just("2", "3", "4", "5", "6");
+        when(productClientPort.getSimilarIds("1")).thenReturn(ids);
+        when(productClientPort.getProductDetail(anyString()))
+                .thenAnswer(invocation -> Mono.just(new ProductDetail(invocation.getArgument(0), "Product", 10.0, true))
+                        .delayElement(upstreamDelay));
+
+        long start = System.nanoTime();
+        StepVerifier.create(service.getSimilarProducts("1"))
+                .expectNextCount(5)
+                .verifyComplete();
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+        // 5 details resolved in parallel should take ~1 upstream call, not 5 sequential ones.
+        assertThat(elapsed).isLessThan(upstreamDelay.multipliedBy(3));
     }
 
     @Test

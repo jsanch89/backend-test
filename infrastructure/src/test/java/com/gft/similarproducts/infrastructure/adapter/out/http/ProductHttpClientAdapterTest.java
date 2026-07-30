@@ -2,6 +2,11 @@ package com.gft.similarproducts.infrastructure.adapter.out.http;
 
 import com.gft.similarproducts.domain.exception.ProductNotFoundException;
 import com.gft.similarproducts.domain.model.ProductDetail;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
@@ -15,9 +20,12 @@ import reactor.test.StepVerifier;
 import java.io.IOException;
 import java.time.Duration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class ProductHttpClientAdapterTest {
 
     private MockWebServer server;
+    private WebClient webClient;
     private ProductHttpClientAdapter adapter;
 
     @BeforeEach
@@ -26,11 +34,17 @@ class ProductHttpClientAdapterTest {
         server.start();
 
         HttpClient httpClient = HttpClient.create().responseTimeout(Duration.ofMillis(300));
-        WebClient webClient = WebClient.builder()
+        webClient = WebClient.builder()
                 .baseUrl(server.url("/").toString())
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
-        adapter = new ProductHttpClientAdapter(webClient);
+
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(
+                CircuitBreakerConfig.custom().slidingWindowSize(20).build());
+        TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(
+                TimeLimiterConfig.custom().timeoutDuration(Duration.ofMillis(500)).build());
+
+        adapter = new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry);
     }
 
     @AfterEach
@@ -70,6 +84,29 @@ class ProductHttpClientAdapterTest {
         StepVerifier.create(adapter.getProductDetail("1"))
                 .expectError()
                 .verify();
+    }
+
+    @Test
+    void shouldOpenCircuitBreakerAfterRepeatedFailures() {
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(
+                CircuitBreakerConfig.custom()
+                        .slidingWindowSize(4)
+                        .minimumNumberOfCalls(4)
+                        .failureRateThreshold(50)
+                        .waitDurationInOpenState(Duration.ofSeconds(10))
+                        .build());
+        TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(
+                TimeLimiterConfig.custom().timeoutDuration(Duration.ofMillis(500)).build());
+        ProductHttpClientAdapter localAdapter =
+                new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry);
+
+        for (int i = 0; i < 4; i++) {
+            server.enqueue(new MockResponse().setResponseCode(500));
+            StepVerifier.create(localAdapter.getProductDetail("1")).expectError().verify();
+        }
+
+        assertThat(circuitBreakerRegistry.circuitBreaker("productDetail").getState())
+                .isEqualTo(CircuitBreaker.State.OPEN);
     }
 
     @Test
