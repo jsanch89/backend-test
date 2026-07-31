@@ -24,7 +24,7 @@ API-first en [`infrastructure/src/main/resources/api/similarProducts.yaml`](infr
 ./gradlew :infrastructure:bootRun
 ```
 
-Arranca en `http://localhost:5001`. Por defecto asume que las APIs existentes están
+Arranca en `http://localhost:5000`. Por defecto asume que las APIs existentes están
 en `http://localhost:3001` (mock); para apuntar a otra URL:
 
 ```bash
@@ -35,7 +35,7 @@ EXISTING_APIS_BASE_URL=http://localhost:3001 ./gradlew :infrastructure:bootRun
 
 ```bash
 docker build -t similar-products .
-docker run -p 5001:5001 -e EXISTING_APIS_BASE_URL=http://host.docker.internal:3001 similar-products
+docker run -p 5000:5000 -e EXISTING_APIS_BASE_URL=http://host.docker.internal:3001 similar-products
 ```
 
 El `Dockerfile` es multi-stage: una etapa con `eclipse-temurin:21-jdk` compila el
@@ -49,9 +49,9 @@ de su `docker-compose`.
 
 Con la app arrancada (local o Docker):
 
-- `http://localhost:5001/swagger-ui.html` — UI interactiva sobre el contrato real
+- `http://localhost:5000/swagger-ui.html` — UI interactiva sobre el contrato real
   (`/api/similarProducts.yaml`).
-- `http://localhost:5001/v3/api-docs` — spec generado por springdoc.
+- `http://localhost:5000/v3/api-docs` — spec generado por springdoc.
 
 ## Tests
 

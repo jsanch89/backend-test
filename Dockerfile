@@ -15,7 +15,7 @@ WORKDIR /app
 
 COPY --from=build /workspace/infrastructure/build/libs/*.jar app.jar
 
-EXPOSE 5001
+EXPOSE 5000
 ENV EXISTING_APIS_BASE_URL=http://host.docker.internal:3001
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
