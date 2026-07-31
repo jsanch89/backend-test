@@ -83,6 +83,28 @@ Verificado con el `docker-compose`/scripts de k6 provistos en el enunciado
 contenedor Docker descrito arriba. Resultados y análisis completos en
 [`plan/k6-results.md`](plan/k6-results.md).
 
+Se ejecutó dos veces el mismo script (200 VUs × 5 escenarios de 10s contra `product/1..5`,
+es decir, los mismos 5 ids repetidos miles de veces): una sin caché y otra tras
+implementar la caché de Caffeine (TTL 60s). Al reutilizar el mismo puñado de ids, es
+justo el caso de uso que la caché está pensada para absorber:
+
+| Métrica | Sin caché | Con caché |
+|---|---|---|
+| Peticiones totales | 13 261 | 13 521 |
+| Throughput | 217.5 req/s | 223.0 req/s |
+| Errores 500 | 112 (~0.84%) | **0** |
+| `http_req_duration` p90 | 585ms | 1.6s |
+| `http_req_duration` p95 | 1.21s | 2s |
+| `http_req_duration` max | 5s | **2.11s** |
+
+La caché elimina por completo los 500 por saturación del pool de conexiones que aparecían
+sin ella, y baja el peor caso (`max`) de 5s a ~2.1s (ahora el límite real es el `TimeLimiter`
+de 2s configurado en la resiliencia, no el agotamiento del pool). A cambio, p90/p95 suben: peticiones que antes
+fallaban rápido por falta de conexiones ahora esperan el timeout completo y responden 200
+igualmente — un trade-off de fiabilidad por latencia, que es la mejora buscada. Detalle
+completo (consultas InfluxDB por escenario/status, métricas crudas de k6) en
+[`plan/k6-results.md`](plan/k6-results.md).
+
 ## Decisiones de diseño
 
 ### Arquitectura hexagonal
@@ -132,11 +154,14 @@ listado original, en vez de secuencialmente uno a uno.
 
 ### Caché
 
-**Pendiente** (tarea T11 del plan, no implementada en esta entrega): la idea es
-cachear `getSimilarIds`/`getProductDetail` (p. ej. con Caffeine, TTL corto) para
-reducir la carga sobre las APIs existentes y mitigar el pico de errores por
-saturación del pool de conexiones observado en la prueba de carga inicial (ver
-`plan/k6-results.md`).
+`getProductDetail`/`getSimilarIds` (`ProductHttpClientAdapter`) cachean por `productId`
+con Caffeine (TTL y tamaño máximo externalizados en `application.yml`: `cache.ttl-seconds`,
+`cache.max-size`), para reducir la carga sobre las APIs existentes y mitigar el pico de
+errores por saturación del pool de conexiones observado en la prueba de carga inicial
+(ver `plan/k6-results.md`). Se cachea el `Mono` resultante (`.cache(ttlForValue, ttlForError,
+ttlForEmpty)` de Reactor) para que las suscripciones concurrentes/repetidas reutilicen la
+misma señal sin volver a golpear el upstream; los errores se cachean con TTL cero para no
+fijar fallos transitorios.
 
 ### Gestión de errores
 
@@ -155,4 +180,3 @@ define un esquema de error propio):
 - No hay reintentos (`retry`) sobre la llamada de detalle, para no amplificar carga
   sobre las APIs existentes bajo el circuit breaker ya activo.
 - El mensaje de error 500 es fijo y no expone detalles internos de la excepción.
-- Sin caché (ver arriba): cada petición vuelve a golpear las APIs existentes.

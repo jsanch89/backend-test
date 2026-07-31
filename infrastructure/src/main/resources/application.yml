@@ -9,6 +9,10 @@ springdoc:
   swagger-ui:
     url: /api/similarProducts.yaml
 
+cache:
+  ttl-seconds: 60
+  max-size: 10000
+
 existing-apis:
   base-url: ${EXISTING_APIS_BASE_URL:http://localhost:3001}
   connect-timeout-ms: 1000

@@ -44,7 +44,7 @@ class ProductHttpClientAdapterTest {
         TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(
                 TimeLimiterConfig.custom().timeoutDuration(Duration.ofMillis(500)).build());
 
-        adapter = new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry);
+        adapter = new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry, 60, 10_000);
     }
 
     @AfterEach
@@ -98,7 +98,7 @@ class ProductHttpClientAdapterTest {
         TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(
                 TimeLimiterConfig.custom().timeoutDuration(Duration.ofMillis(500)).build());
         ProductHttpClientAdapter localAdapter =
-                new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry);
+                new ProductHttpClientAdapter(webClient, circuitBreakerRegistry, timeLimiterRegistry, 60, 10_000);
 
         for (int i = 0; i < 4; i++) {
             server.enqueue(new MockResponse().setResponseCode(500));
@@ -129,5 +129,55 @@ class ProductHttpClientAdapterTest {
         StepVerifier.create(adapter.getSimilarIds("unknown"))
                 .expectError(ProductNotFoundException.class)
                 .verify();
+    }
+
+    @Test
+    void shouldCacheProductDetailAndNotHitUpstreamTwice() {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":\"1\",\"name\":\"Product 1\",\"price\":10.5,\"availability\":true}"));
+
+        StepVerifier.create(adapter.getProductDetail("1"))
+                .expectNext(new ProductDetail("1", "Product 1", 10.5, true))
+                .verifyComplete();
+
+        StepVerifier.create(adapter.getProductDetail("1"))
+                .expectNext(new ProductDetail("1", "Product 1", 10.5, true))
+                .verifyComplete();
+
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldCacheSimilarIdsAndNotHitUpstreamTwice() {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("[\"2\",\"3\"]"));
+
+        StepVerifier.create(adapter.getSimilarIds("1")).expectNext("2").expectNext("3").verifyComplete();
+        StepVerifier.create(adapter.getSimilarIds("1")).expectNext("2").expectNext("3").verifyComplete();
+
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldNotCacheErrorsAndRetryUpstreamOnNextCall() {
+        server.enqueue(new MockResponse().setResponseCode(404));
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"id\":\"1\",\"name\":\"Product 1\",\"price\":10.5,\"availability\":true}"));
+
+        StepVerifier.create(adapter.getProductDetail("1"))
+                .expectError(ProductNotFoundException.class)
+                .verify();
+
+        StepVerifier.create(adapter.getProductDetail("1"))
+                .expectNext(new ProductDetail("1", "Product 1", 10.5, true))
+                .verifyComplete();
+
+        assertThat(server.getRequestCount()).isEqualTo(2);
     }
 }

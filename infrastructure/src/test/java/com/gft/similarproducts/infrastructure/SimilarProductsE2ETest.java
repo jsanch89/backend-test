@@ -1,6 +1,7 @@
 package com.gft.similarproducts.infrastructure;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.gft.similarproducts.infrastructure.adapter.out.http.ProductHttpClientAdapter;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class SimilarProductsE2ETest {
     @Autowired
     private CircuitBreakerRegistry circuitBreakerRegistry;
 
+    @Autowired
+    private ProductHttpClientAdapter productHttpClientAdapter;
+
     private WebTestClient webTestClient;
 
     @BeforeEach
@@ -57,6 +61,7 @@ class SimilarProductsE2ETest {
     void resetInfrastructure() {
         wireMock.resetAll();
         circuitBreakerRegistry.circuitBreaker("productDetail").reset();
+        productHttpClientAdapter.evictAllCaches();
     }
 
     @Test
